@@ -16,6 +16,7 @@ from datasets import load_dataset
 from outlier_handling import zscore_filter, iqr_filter
 from normalisation import minmax_scale, standard_scale, robust_scale
 from kmeans_core import KMeans
+from distance_metrics import get_metric
 
 OUTLIER_METHODS = ['none', 'zscore', 'iqr']
 NORM_METHODS = ['none', 'minmax', 'standard', 'robust']
@@ -26,6 +27,15 @@ METRICS_LIST = [
     'inertia', 'silhouette', 'ari', 'nmi', 'acc', 'macro_f1',
     'removed_count', 'removed_pct',
 ]
+
+
+def _pairwise_distance_matrix(X, metric):
+    """
+    """
+    distance_fn = get_metric(metric)
+    D = distance_fn(X, X)
+    np.fill_diagonal(D, 0.0)
+    return D
 
 
 def optimal_mapping(y_true, y_pred):
@@ -99,7 +109,8 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         X_proc = standard_scale(X_proc)
     elif norm_method == 'robust':
         X_proc = robust_scale(X_proc)
-    # 'none': leave X_proc unscaled
+
+    D_proc = _pairwise_distance_matrix(X_proc, metric)
 
     results = {m: [] for m in METRICS_LIST}
 
@@ -127,7 +138,9 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
             continue
 
         results['inertia'].append(model.inertia_)
-        results['silhouette'].append(silhouette_score(X_proc, labels))
+        results['silhouette'].append(
+            silhouette_score(D_proc, labels, metric='precomputed')
+        )
         results['ari'].append(adjusted_rand_score(y_proc, labels))
         results['nmi'].append(normalized_mutual_info_score(y_proc, labels))
         results['acc'].append(compute_accuracy(y_proc, labels))
