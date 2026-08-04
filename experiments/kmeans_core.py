@@ -83,17 +83,29 @@ class KMeans:
         return np.argmin(self._distances(X, centroids), axis=1)
 
     def _update(self, X, labels, rng, centroids=None):
-        """Update centroids using arithmetic mean."""
+        """Update centroids using means, or component-wise modes for Hamming."""
         if centroids is None:
             centroids = self.centroids
         new_centroids = np.zeros_like(centroids)
         for j in range(self.n_clusters):
             members = X[labels == j]
             if len(members) > 0:
-                new_centroids[j] = members.mean(axis=0)
+                if self.metric == 'hamming':
+                    new_centroids[j] = self._componentwise_mode(members)
+                else:
+                    new_centroids[j] = members.mean(axis=0)
             else:
                 new_centroids[j] = X[rng.integers(len(X))]
         return new_centroids
+
+    @staticmethod
+    def _componentwise_mode(X):
+        """Return a deterministic categorical prototype for Hamming distance."""
+        modes = np.empty(X.shape[1], dtype=X.dtype)
+        for feature_idx in range(X.shape[1]):
+            values, counts = np.unique(X[:, feature_idx], return_counts=True)
+            modes[feature_idx] = values[np.argmax(counts)]
+        return modes
 
     @staticmethod
     def _compute_inertia_centroids(X, labels, centroids):

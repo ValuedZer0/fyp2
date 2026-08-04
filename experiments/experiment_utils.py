@@ -18,6 +18,7 @@ Fixes applied vs. the earlier version:
      with how the existing "too few samples" case is already handled.
 """
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import (
     adjusted_rand_score,
     normalized_mutual_info_score,
@@ -35,36 +36,46 @@ NORM_METHODS = ['none', 'minmax', 'standard', 'robust']
 DISTANCE_METRICS = ['euclidean', 'manhattan', 'cosine', 'minkowski',
                      'chebyshev', 'correlation', 'hamming']
 
-METRICS_LIST = ['inertia', 'silhouette', 'ari', 'nmi', 'acc', 'macro_f1']
+METRICS_LIST = [
+    'inertia', 'silhouette', 'ari', 'nmi', 'acc', 'macro_f1',
+    'removed_count', 'removed_pct',
+]
 
 
-def majority_mapping(y_true, y_pred):
-    """Map each predicted cluster to its majority true class."""
-    mapping = {}
-    for cluster in np.unique(y_pred):
-        mask = y_pred == cluster
-        true_in_cluster = y_true[mask]
-        if len(true_in_cluster) == 0:
-            mapping[cluster] = 0
-        else:
-            mapping[cluster] = np.bincount(true_in_cluster).argmax()
-    return mapping
+def optimal_mapping(y_true, y_pred):
+    """Map predicted clusters to true classes using a one-to-one assignment."""
+    true_labels, true_ids = np.unique(y_true, return_inverse=True)
+    pred_labels, pred_ids = np.unique(y_pred, return_inverse=True)
+    contingency = np.zeros((len(pred_labels), len(true_labels)), dtype=int)
+    np.add.at(contingency, (pred_ids, true_ids), 1)
+
+    pred_idx, true_idx = linear_sum_assignment(-contingency)
+    return {pred_labels[p]: true_labels[t] for p, t in zip(pred_idx, true_idx)}
+
+
+def _mapped_labels(y_true, y_pred):
+    """Apply the optimal cluster-to-class mapping; unmatched clusters are errors."""
+    mapping = optimal_mapping(y_true, y_pred)
+    return np.array([mapping.get(label, -1) for label in y_pred])
 
 
 def compute_accuracy(y_true, y_pred):
-    mapping = majority_mapping(y_true, y_pred)
-    y_mapped = np.array([mapping[label] for label in y_pred])
+    y_mapped = _mapped_labels(y_true, y_pred)
     return np.mean(y_mapped == y_true)
 
 
 def compute_macro_f1(y_true, y_pred):
-    mapping = majority_mapping(y_true, y_pred)
-    y_mapped = np.array([mapping[label] for label in y_pred])
-    return f1_score(y_true, y_mapped, average='macro')
+    y_mapped = _mapped_labels(y_true, y_pred)
+    return f1_score(
+        y_true, y_mapped, labels=np.unique(y_true), average='macro', zero_division=0
+    )
 
 
-def _nan_row(metrics_list=METRICS_LIST):
-    return {m: (np.nan, np.nan, np.nan, np.nan) for m in metrics_list}
+def _nan_row(metrics_list=METRICS_LIST, removed_count=np.nan, removed_pct=np.nan):
+    row = {m: (np.nan, np.nan, np.nan, np.nan) for m in metrics_list}
+    row['removed_count'] = (removed_count, 0.0, removed_count, removed_count)
+    row['removed_pct'] = (removed_pct, 0.0, removed_pct, removed_pct)
+    return row
 
 
 def run_single_config(dataset_name, outlier_method, norm_method, metric,
@@ -94,9 +105,12 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
                                         min_per_class=min_per_class)
     # 'none': X_proc, y_proc stay as the original copies
 
+    removed_count = X.shape[0] - X_proc.shape[0]
+    removed_pct = 100.0 * removed_count / X.shape[0]
+
     if X_proc.shape[0] < n_clusters:
         # Not enough points left to even attempt n_clusters clusters.
-        return _nan_row()
+        return _nan_row(removed_count=removed_count, removed_pct=removed_pct)
 
     n_classes_remaining = len(np.unique(y_proc))
     if n_classes_remaining < n_clusters:
@@ -104,7 +118,7 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         # Evaluating with the ORIGINAL n_clusters against fewer remaining
         # classes silently mismatches cluster count to class count, so
         # this configuration is skipped rather than silently biased.
-        return _nan_row()
+        return _nan_row(removed_count=removed_count, removed_pct=removed_pct)
 
     if norm_method == 'minmax':
         X_proc = minmax_scale(X_proc)
@@ -129,6 +143,11 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         ).fit(X_proc)
 
         labels = model.labels_
+
+        # Preprocessing is deterministic, but store it with every run so its
+        # aggregate columns use the same output schema as the other metrics.
+        results['removed_count'].append(removed_count)
+        results['removed_pct'].append(removed_pct)
 
         if len(np.unique(labels)) < 2 or X_proc.shape[0] < 2:
             results['inertia'].append(model.inertia_)

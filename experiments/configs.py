@@ -39,11 +39,11 @@ DISTANCE_METRICS = [
     'hamming'
 ]
 
-# Contamination levels (fraction of injected outliers)
+# Contamination levels
 CONTAMINATION_LEVELS = [
-    0.0,   # clean (original data)
+    0.0,
 
 ]
 
 # Number of K-means repetitions per configuration
-N_RUNS = 100
+N_RUNS = 30
