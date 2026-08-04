@@ -1,11 +1,96 @@
-from sklearn.preprocessing import Normalizer
-from sklearn.cluster import KMeans
+# kmeans/distances.py
+"""
+Distance metrics, kept completely independent of the KMeans class.
+Each function takes (X, centroids) -> (n_samples, n_clusters) distance array.
 
-def run_kmeans(X, n_clusters, metric='euclidean', random_state=42, n_init=1):
-    if metric == 'cosine':
-        # Normalize to unit length, then use Euclidean
-        X = Normalizer(norm='l2').fit_transform(X)
-        metric = 'euclidean'
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
-    kmeans.fit(X)
-    return kmeans.labels_, kmeans.inertia_
+"""
+import numpy as np
+
+
+def euclidean(X, centroids):
+    diffs = X[:, np.newaxis, :] - centroids[np.newaxis, :, :]
+    return np.sqrt(np.sum(diffs ** 2, axis=2))
+
+
+def manhattan(X, centroids):
+    diffs = X[:, np.newaxis, :] - centroids[np.newaxis, :, :]
+    return np.sum(np.abs(diffs), axis=2)
+
+
+def cosine(X, centroids):
+    norm_X = np.linalg.norm(X, axis=1, keepdims=True)
+    norm_c = np.linalg.norm(centroids, axis=1, keepdims=True)
+    sim = np.dot(X / (norm_X + 1e-10), (centroids / (norm_c + 1e-10)).T)
+    return 1.0 - np.clip(sim, -1.0, 1.0)
+
+
+def chebyshev(X, centroids):
+    diffs = X[:, np.newaxis, :] - centroids[np.newaxis, :, :]
+    return np.max(np.abs(diffs), axis=2)
+
+
+def minkowski(X, centroids, p=3):
+    diffs = X[:, np.newaxis, :] - centroids[np.newaxis, :, :]
+    return np.sum(np.abs(diffs) ** p, axis=2) ** (1.0 / p)
+
+
+# def correlation(X, centroids):
+#     X_mean = X.mean(axis=1, keepdims=True)
+#     c_mean = centroids.mean(axis=1, keepdims=True)
+#     X_c = X - X_mean
+#     c_c = centroids - c_mean
+#     cov = np.dot(X_c, c_c.T)
+#     std_X = np.std(X, axis=1, ddof=0).reshape(-1, 1)
+#     std_c = np.std(centroids, axis=1, ddof=0).reshape(1, -1)
+#     rho = cov / (std_X * std_c + 1e-10)
+#     rho = np.clip(rho, -1.0, 1.0)
+#     return 1.0 - rho
+
+def correlation(X, centroids):
+    # Center the data
+    X_c = X - X.mean(axis=1, keepdims=True)
+    C_c = centroids - centroids.mean(axis=1, keepdims=True)
+
+    m = X.shape[1]   # number of features
+
+    # Covariance (properly normalised by m)
+    cov = np.dot(X_c, C_c.T) / m
+
+    # Standard deviations (population, ddof=0)
+    std_X = np.std(X, axis=1, ddof=0).reshape(-1, 1)
+    std_C = np.std(centroids, axis=1, ddof=0).reshape(1, -1)
+
+    rho = cov / (std_X * std_C + 1e-10)
+    rho = np.clip(rho, -1.0, 1.0)
+    return 1.0 - rho
+
+
+def hamming(X, centroids):
+    diffs = X[:, np.newaxis, :] != centroids[np.newaxis, :, :]
+    return np.sum(diffs, axis=2)
+
+METRICS = {
+    'euclidean': euclidean,
+    'manhattan': manhattan,
+    'cosine': cosine,
+    'chebyshev': chebyshev,
+    'minkowski': minkowski,
+    'correlation': correlation,
+    'hamming': hamming,
+}
+
+def get_metric(metric):
+    """
+    Resolve a metric argument into a callable (X, centroids) -> distances.
+    Accepts either a registered name (str) or a custom callable directly,
+    so callers can pass their own metric without ever touching this file.
+    """
+    if callable(metric):
+        return metric
+    try:
+        return METRICS[metric]
+    except KeyError:
+        raise ValueError(
+            f"Unsupported metric: {metric!r}. "
+            f"Available: {list(METRICS)} or pass a callable."
+        )
