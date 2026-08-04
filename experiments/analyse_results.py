@@ -1,4 +1,4 @@
-# analyse_results.py (minimal – best-per-factor tables + best per dataset by accuracy)
+# analyse_results.py  (best per factor tables + best per dataset by accuracy)
 import pandas as pd
 import numpy as np
 import os

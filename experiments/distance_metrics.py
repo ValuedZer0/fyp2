@@ -1,6 +1,6 @@
 # kmeans/distances.py
 """
-Distance metrics, kept completely independent of the KMeans class.
+Distance metrics
 Each function takes (X, centroids) -> (n_samples, n_clusters) distance array.
 
 """
@@ -33,18 +33,6 @@ def minkowski(X, centroids, p=3):
     diffs = X[:, np.newaxis, :] - centroids[np.newaxis, :, :]
     return np.sum(np.abs(diffs) ** p, axis=2) ** (1.0 / p)
 
-
-# def correlation(X, centroids):
-#     X_mean = X.mean(axis=1, keepdims=True)
-#     c_mean = centroids.mean(axis=1, keepdims=True)
-#     X_c = X - X_mean
-#     c_c = centroids - c_mean
-#     cov = np.dot(X_c, c_c.T)
-#     std_X = np.std(X, axis=1, ddof=0).reshape(-1, 1)
-#     std_c = np.std(centroids, axis=1, ddof=0).reshape(1, -1)
-#     rho = cov / (std_X * std_c + 1e-10)
-#     rho = np.clip(rho, -1.0, 1.0)
-#     return 1.0 - rho
 
 def correlation(X, centroids):
     # Center the data
@@ -81,9 +69,7 @@ METRICS = {
 
 def get_metric(metric):
     """
-    Resolve a metric argument into a callable (X, centroids) -> distances.
-    Accepts either a registered name (str) or a custom callable directly,
-    so callers can pass their own metric without ever touching this file.
+    Returns the distance function for selected metrics
     """
     if callable(metric):
         return metric

@@ -1,21 +1,7 @@
 # experiment_utils.py
 """
-Shared logic for running a single (dataset, outlier_method, norm_method,
-metric) configuration n_runs times and aggregating the results.
+Shared logic for running a single configuration n_runs times and aggregating the results.
 
-Used by both run_one_dataset.py (single hardcoded dataset) and
-run_all_dataset.py (loops over every dataset in configs.DATASETS) so the
-evaluation logic only exists in one place.
-
-Fixes applied vs. the earlier version:
-  1. Outlier removal and normalisation are deterministic (no random_state)
-     but were previously recomputed once per run inside the n_runs loop.
-     They're now computed once per configuration, outside the loop.
-  2. If outlier removal eliminates an entire true class, n_clusters (chosen
-     from the ORIGINAL label set) would then be evaluated against fewer
-     remaining classes than it was set up for -- a silent methodological
-     mismatch. This is now detected and the run is skipped (NaN), consistent
-     with how the existing "too few samples" case is already handled.
 """
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -84,17 +70,10 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
     Runs one (outlier_method, norm_method, metric) configuration n_runs
     times on dataset_name and returns aggregated (mean, std, min, max)
     per evaluation metric.
-
-    min_per_class : int or None
-        Passed through to zscore_filter/iqr_filter. If given, guarantees
-        outlier removal never eliminates a whole class entirely (e.g.
-        ecoli's imL/imS, 2 samples each) -- see outlier_handling.py for
-        details. None reproduces the original (unprotected) behaviour.
     """
     X, y_true = load_dataset(dataset_name)
     n_clusters = len(np.unique(y_true))
 
-    # ---- Preprocessing: deterministic, so computed ONCE for this config ----
     X_proc, y_proc = X.copy(), y_true.copy()
 
     if outlier_method == 'zscore':
@@ -103,21 +82,15 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
     elif outlier_method == 'iqr':
         X_proc, y_proc, _ = iqr_filter(X_proc, y_proc, multiplier=1.5,
                                         min_per_class=min_per_class)
-    # 'none': X_proc, y_proc stay as the original copies
 
     removed_count = X.shape[0] - X_proc.shape[0]
     removed_pct = 100.0 * removed_count / X.shape[0]
 
     if X_proc.shape[0] < n_clusters:
-        # Not enough points left to even attempt n_clusters clusters.
         return _nan_row(removed_count=removed_count, removed_pct=removed_pct)
 
     n_classes_remaining = len(np.unique(y_proc))
     if n_classes_remaining < n_clusters:
-        # Outlier removal wiped out at least one whole true class.
-        # Evaluating with the ORIGINAL n_clusters against fewer remaining
-        # classes silently mismatches cluster count to class count, so
-        # this configuration is skipped rather than silently biased.
         return _nan_row(removed_count=removed_count, removed_pct=removed_pct)
 
     if norm_method == 'minmax':
@@ -144,8 +117,6 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
         labels = model.labels_
 
-        # Preprocessing is deterministic, but store it with every run so its
-        # aggregate columns use the same output schema as the other metrics.
         results['removed_count'].append(removed_count)
         results['removed_pct'].append(removed_pct)
 

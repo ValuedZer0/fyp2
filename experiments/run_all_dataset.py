@@ -10,7 +10,7 @@ from configs import DATASETS
 from experiment_utils import run_all_configs
 
 # ---------------- Configuration ----------------
-N_RUNS = 100
+N_RUNS = 30
 RANDOM_STATE_BASE = 42
 RESULTS_DIR = 'results'
 # ------------------------------------------------

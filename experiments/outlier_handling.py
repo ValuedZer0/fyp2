@@ -2,41 +2,41 @@
 import numpy as np
 
 
-def inject_outliers(X, y=None, contamination=0.05, scale_factor=5.0, random_state=None):
-    """
-    Add synthetic outliers to a copy of X (and y if given).
+# def inject_outliers(X, y=None, contamination=0.05, scale_factor=5.0, random_state=None):
+#     """
+#     Add synthetic outliers to a copy of X (and y if given).
 
-    Parameters
-    ----------
-    X : ndarray (n_samples, n_features)
-    y : ndarray (n_samples,) or None
-    contamination : float, fraction of points to perturb (e.g. 0.05 = 5%)
-    scale_factor : float, noise magnitude = std(X) * scale_factor
-    random_state : int or None for reproducibility
+#     Parameters
+#     ----------
+#     X : ndarray (n_samples, n_features)
+#     y : ndarray (n_samples,) or None
+#     contamination : float, fraction of points to perturb (e.g. 0.05 = 5%)
+#     scale_factor : float, noise magnitude = std(X) * scale_factor
+#     random_state : int or None for reproducibility
 
-    Returns
-    -------
-    X_cont : ndarray, contaminated data
-    y_cont : ndarray (if y provided), otherwise None
-    outlier_idx : indices of injected outliers
-    """
-    rng = np.random.default_rng(random_state)
-    n_samples = X.shape[0]
-    n_outliers = int(n_samples * contamination)
-    if n_outliers == 0:
-        return (X.copy(), y.copy() if y is not None else None, np.array([], dtype=int))
+#     Returns
+#     -------
+#     X_cont : ndarray, contaminated data
+#     y_cont : ndarray (if y provided), otherwise None
+#     outlier_idx : indices of injected outliers
+#     """
+#     rng = np.random.default_rng(random_state)
+#     n_samples = X.shape[0]
+#     n_outliers = int(n_samples * contamination)
+#     if n_outliers == 0:
+#         return (X.copy(), y.copy() if y is not None else None, np.array([], dtype=int))
 
-    idx = rng.choice(n_samples, size=n_outliers, replace=False)
-    stds = np.std(X, axis=0) + 1e-10
-    noise = rng.normal(loc=0, scale=stds * scale_factor, size=(n_outliers, X.shape[1]))
-    X_cont = X.copy()
-    X_cont[idx] = X[idx] + noise
+#     idx = rng.choice(n_samples, size=n_outliers, replace=False)
+#     stds = np.std(X, axis=0) + 1e-10
+#     noise = rng.normal(loc=0, scale=stds * scale_factor, size=(n_outliers, X.shape[1]))
+#     X_cont = X.copy()
+#     X_cont[idx] = X[idx] + noise
 
-    if y is not None:
-        y_cont = y.copy()
-        return X_cont, y_cont, idx
-    else:
-        return X_cont, idx
+#     if y is not None:
+#         y_cont = y.copy()
+#         return X_cont, y_cont, idx
+#     else:
+#         return X_cont, idx
 
 
 def _protect_min_class_size(X, y, mask, min_per_class, extremeness_score):
