@@ -3,8 +3,8 @@ import numpy as np
 from distance_metrics import get_metric
 
 class KMeans:
-    def __init__(self, n_clusters, max_iter=300, tol=1e-4,
-                 random_state=None, metric='euclidean', n_init=10):
+    def __init__(self, n_clusters, max_iter=500, tol=1e-4,
+                 random_state=None, metric='euclidean', n_init=30):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
         self.tol = tol
@@ -83,7 +83,7 @@ class KMeans:
         return np.argmin(self._distances(X, centroids), axis=1)
 
     def _update(self, X, labels, rng, centroids=None):
-        """Update centroids using means, or component-wise modes for Hamming."""
+        """Update centroids using means, medians (Manhattan), or modes (Hamming)."""
         if centroids is None:
             centroids = self.centroids
         new_centroids = np.zeros_like(centroids)
@@ -92,6 +92,8 @@ class KMeans:
             if len(members) > 0:
                 if self.metric == 'hamming':
                     new_centroids[j] = self._componentwise_mode(members)
+                elif self.metric == 'manhattan':
+                    new_centroids[j] = np.median(members, axis=0)  # component‑wise median
                 else:
                     new_centroids[j] = members.mean(axis=0)
             else:
@@ -122,7 +124,7 @@ class KMeans:
         return self.labels_
 
 
-def run_kmeans(X, n_clusters, metric='euclidean', random_state=42, n_init=10):
+def run_kmeans(X, n_clusters, metric='euclidean', random_state=42, n_init=30):
     model = KMeans(
         n_clusters=n_clusters,
         metric=metric,

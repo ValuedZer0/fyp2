@@ -10,7 +10,6 @@ def _protect_min_class_size(X, y, mask, min_per_class, extremeness_score):
         n_kept = mask[cls_idx].sum()
         if n_kept < min_per_class:
             removed_idx = cls_idx[~mask[cls_idx]]
-            # add back the least extreme of the removed points for this class
             order = removed_idx[np.argsort(extremeness_score[removed_idx])]
             need = min_per_class - n_kept
             mask[order[:need]] = True
@@ -46,6 +45,26 @@ def zscore_filter(X, y=None, threshold=3.0, min_per_class=None):
         return X[mask], y[mask], mask
     return X[mask], mask
 
+def zscore_robust_filter(X, y=None, threshold=3.0, min_per_class=None):
+    """
+    Remove points where any feature has a robust |z| > threshold.
+    Robust z‑score uses median and median absolute deviation (MAD)
+    instead of mean and std, making it resistant to the outliers it detects.
+    """
+    from scipy.stats import median_abs_deviation
+
+    med = np.median(X, axis=0)
+    mad = median_abs_deviation(X, axis=0, scale='normal')
+    # scale='normal' makes MAD consistent with std for normal data
+    z_scores = np.abs(0.6745 * (X - med) / (mad + 1e-10))
+    mask = (z_scores < threshold).all(axis=1)
+
+    if y is not None:
+        if min_per_class is not None:
+            extremeness = z_scores.max(axis=1)
+            mask = _protect_min_class_size(X, y, mask, min_per_class, extremeness)
+        return X[mask], y[mask], mask
+    return X[mask], mask
 
 def iqr_filter(X, y=None, multiplier=1.5, min_per_class=None):
     """
@@ -75,8 +94,6 @@ def iqr_filter(X, y=None, multiplier=1.5, min_per_class=None):
     mask = ((X >= lower) & (X <= upper)).all(axis=1)
     if y is not None:
         if min_per_class is not None:
-            # distance beyond the nearest fence, per feature, as an
-            # extremeness score (0 if within fences on that feature)
             beyond_lower = np.maximum(lower - X, 0)
             beyond_upper = np.maximum(X - upper, 0)
             extremeness = (beyond_lower + beyond_upper).max(axis=1)

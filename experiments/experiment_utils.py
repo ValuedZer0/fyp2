@@ -13,19 +13,36 @@ from sklearn.metrics import (
 )
 
 from datasets import load_dataset
-from outlier_handling import zscore_filter, iqr_filter
+from outlier_handling import zscore_filter, iqr_filter, zscore_robust_filter
 from normalisation import minmax_scale, standard_scale, robust_scale
 from kmeans_core import KMeans
 from distance_metrics import get_metric
 
-OUTLIER_METHODS = ['none', 'zscore', 'iqr']
+OUTLIER_METHODS = [
+    'none', 
+    'zscore',          # default threshold = 3.0
+    'zscore_2.5',      # threshold = 2.5
+    'zscore_3.5',      # threshold = 3.5
+    'iqr',             # default multiplier = 1.5
+    'iqr_1.2',         # multiplier = 1.2
+    'iqr_1.8',         # multiplier = 1.8
+    'zscore_robust', 'zscore_robust_2.5', 'zscore_robust_3.5'
+]
 NORM_METHODS = ['none', 'minmax', 'standard', 'robust']
+
 DISTANCE_METRICS = ['euclidean', 'manhattan', 'cosine', 'minkowski',
                      'chebyshev', 'correlation', 'hamming']
 
 METRICS_LIST = [
-    'inertia', 'silhouette', 'ari', 'nmi', 'acc', 'macro_f1',
-    'removed_count', 'removed_pct',
+    'inertia', 
+    'silhouette',   
+    'ari', 
+    'nmi', 
+    'acc', 
+    'purity',
+    'macro_f1', 
+    'removed_count', 
+    'removed_pct',
 ]
 
 
@@ -39,7 +56,6 @@ def _pairwise_distance_matrix(X, metric):
 
 
 def optimal_mapping(y_true, y_pred):
-    """Map predicted clusters to true classes using a one-to-one assignment."""
     true_labels, true_ids = np.unique(y_true, return_inverse=True)
     pred_labels, pred_ids = np.unique(y_pred, return_inverse=True)
     contingency = np.zeros((len(pred_labels), len(true_labels)), dtype=int)
@@ -50,22 +66,62 @@ def optimal_mapping(y_true, y_pred):
 
 
 def _mapped_labels(y_true, y_pred):
-    """Apply the optimal cluster-to-class mapping; unmatched clusters are errors."""
     mapping = optimal_mapping(y_true, y_pred)
     return np.array([mapping.get(label, -1) for label in y_pred])
 
-
-def compute_accuracy(y_true, y_pred):
-    y_mapped = _mapped_labels(y_true, y_pred)
+def compute_purity(y_true, y_pred):
+    """Majority‑vote (purity) accuracy."""
+    mapping = {}
+    for cluster in np.unique(y_pred):
+        mask = (y_pred == cluster)
+        true_in_cluster = y_true[mask]
+        if len(true_in_cluster) > 0:
+            mapping[cluster] = np.bincount(true_in_cluster).argmax()
+        else:
+            mapping[cluster] = 0
+    y_mapped = np.array([mapping[label] for label in y_pred])
     return np.mean(y_mapped == y_true)
 
+def compute_hungarian_accuracy(y_true, y_pred):
+    y_mapped = _mapped_labels(y_true, y_pred)  
+    return np.mean(y_mapped == y_true)
+
+# def compute_purity(y_true, y_pred):
+#     """Majority‑vote (purity) accuracy – NOT one‑to‑one."""
+#     mapping = {}
+#     for cluster in np.unique(y_pred):
+#         mask = (y_pred == cluster)
+#         true_in_cluster = y_true[mask]
+#         if len(true_in_cluster) > 0:
+#             mapping[cluster] = np.bincount(true_in_cluster).argmax()
+#         else:
+#             mapping[cluster] = 0
+#     y_mapped = np.array([mapping[label] for label in y_pred])
+#     return np.mean(y_mapped == y_true)
+
+# def compute_macro_f1(y_true, y_pred):
+#     y_mapped = _mapped_labels(y_true, y_pred)
+#     return f1_score(
+#         y_true, y_mapped, labels=np.unique(y_true), average='macro', zero_division=0
+#     )
 
 def compute_macro_f1(y_true, y_pred):
-    y_mapped = _mapped_labels(y_true, y_pred)
+    """Macro‑F1 using majority‑vote (purity) mapping."""
+    mapping = {}
+    for cluster in np.unique(y_pred):
+        mask = (y_pred == cluster)
+        true_in_cluster = y_true[mask]
+        if len(true_in_cluster) > 0:
+            mapping[cluster] = np.bincount(true_in_cluster).argmax()
+        else:
+            mapping[cluster] = 0
+    y_mapped = np.array([mapping[label] for label in y_pred])
     return f1_score(
-        y_true, y_mapped, labels=np.unique(y_true), average='macro', zero_division=0
+        y_true, y_mapped,
+        labels=np.unique(y_true),
+        average='macro',
+        zero_division=0
     )
-
 
 def _nan_row(metrics_list=METRICS_LIST, removed_count=np.nan, removed_pct=np.nan):
     row = {m: (np.nan, np.nan, np.nan, np.nan) for m in metrics_list}
@@ -86,11 +142,29 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
     X_proc, y_proc = X.copy(), y_true.copy()
 
-    if outlier_method == 'zscore':
-        X_proc, y_proc, _ = zscore_filter(X_proc, y_proc, threshold=3.0,
+         # --- Outlier handling ---
+    if outlier_method.startswith('zscore_robust'):
+        # 'zscore_robust' -> threshold=3.0, 'zscore_robust_2.5' -> threshold=2.5
+        if outlier_method == 'zscore_robust':
+            threshold = 3.0
+        else:
+            threshold = float(outlier_method.split('_')[2])
+        X_proc, y_proc, _ = zscore_robust_filter(X_proc, y_proc, threshold=threshold,
+                                                 min_per_class=min_per_class)
+    elif outlier_method.startswith('zscore'):
+        # 'zscore' -> threshold=3.0, 'zscore_2.5' -> threshold=2.5
+        if outlier_method == 'zscore':
+            threshold = 3.0
+        else:
+            threshold = float(outlier_method.split('_')[1])
+        X_proc, y_proc, _ = zscore_filter(X_proc, y_proc, threshold=threshold,
                                            min_per_class=min_per_class)
-    elif outlier_method == 'iqr':
-        X_proc, y_proc, _ = iqr_filter(X_proc, y_proc, multiplier=1.5,
+    elif outlier_method.startswith('iqr'):
+        if outlier_method == 'iqr':
+            multiplier = 1.5
+        else:
+            multiplier = float(outlier_method.split('_')[1])
+        X_proc, y_proc, _ = iqr_filter(X_proc, y_proc, multiplier=multiplier,
                                         min_per_class=min_per_class)
 
     removed_count = X.shape[0] - X_proc.shape[0]
@@ -109,6 +183,7 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         X_proc = standard_scale(X_proc)
     elif norm_method == 'robust':
         X_proc = robust_scale(X_proc)
+    
 
     D_proc = _pairwise_distance_matrix(X_proc, metric)
 
@@ -119,11 +194,11 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
         model = KMeans(
             n_clusters=n_clusters,
-            max_iter=300,
+            max_iter=500,
             tol=1e-4,
             random_state=seed,
             metric=metric,
-            n_init=10,
+            n_init=30,
         ).fit(X_proc)
 
         labels = model.labels_
@@ -133,7 +208,7 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
         if len(np.unique(labels)) < 2 or X_proc.shape[0] < 2:
             results['inertia'].append(model.inertia_)
-            for m in ['silhouette', 'ari', 'nmi', 'acc', 'macro_f1']:
+            for m in ['silhouette', 'ari', 'nmi', 'acc', 'purity', 'macro_f1']:
                 results[m].append(np.nan)
             continue
 
@@ -143,7 +218,8 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         )
         results['ari'].append(adjusted_rand_score(y_proc, labels))
         results['nmi'].append(normalized_mutual_info_score(y_proc, labels))
-        results['acc'].append(compute_accuracy(y_proc, labels))
+        results['acc'].append(compute_hungarian_accuracy(y_proc, labels))
+        results['purity'].append(compute_purity(y_proc, labels))
         results['macro_f1'].append(compute_macro_f1(y_proc, labels))
 
     agg = {}

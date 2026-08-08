@@ -10,8 +10,8 @@ import pandas as pd
 from experiment_utils import run_all_configs
 
 # ---------------- Configuration ----------------
-DATASET_NAME = 'glass'
-N_RUNS = 30
+DATASET_NAME = 'iris'
+N_RUNS = 100
 RANDOM_STATE_BASE = 42
 RESULTS_DIR = 'results'
 # ------------------------------------------------

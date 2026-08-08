@@ -46,4 +46,4 @@ CONTAMINATION_LEVELS = [
 ]
 
 # Number of K-means repetitions per configuration
-N_RUNS = 30
+N_RUNS = 100
