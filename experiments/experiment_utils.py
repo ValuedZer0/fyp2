@@ -1,7 +1,6 @@
 # experiment_utils.py
 """
 Shared logic for running a single configuration n_runs times and aggregating the results.
-
 """
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -19,7 +18,7 @@ from kmeans_core import KMeans
 from distance_metrics import get_metric
 
 OUTLIER_METHODS = [
-    'none', 
+    'none',
     'zscore',          # default threshold = 3.0
     'zscore_2.5',      # threshold = 2.5
     'zscore_3.5',      # threshold = 3.5
@@ -34,21 +33,19 @@ DISTANCE_METRICS = ['euclidean', 'manhattan', 'cosine', 'minkowski',
                      'chebyshev', 'correlation', 'hamming']
 
 METRICS_LIST = [
-    'inertia', 
-    'silhouette',   
-    'ari', 
-    'nmi', 
-    'acc', 
-    'purity',
-    'macro_f1', 
-    'removed_count', 
+    'inertia',
+    'silhouette',
+    'ari',
+    'nmi',
+    'acc',                # purity (majority‑vote accuracy)
+    'hungarian_acc',      # Hungarian one‑to‑one accuracy
+    'macro_f1',
+    'removed_count',
     'removed_pct',
 ]
 
 
 def _pairwise_distance_matrix(X, metric):
-    """
-    """
     distance_fn = get_metric(metric)
     D = distance_fn(X, X)
     np.fill_diagonal(D, 0.0)
@@ -69,8 +66,9 @@ def _mapped_labels(y_true, y_pred):
     mapping = optimal_mapping(y_true, y_pred)
     return np.array([mapping.get(label, -1) for label in y_pred])
 
-def compute_purity(y_true, y_pred):
-    """Majority‑vote (purity) accuracy."""
+
+def compute_accuracy(y_true, y_pred):
+    """Majority‑vote (purity) accuracy – now the default 'acc' column."""
     mapping = {}
     for cluster in np.unique(y_pred):
         mask = (y_pred == cluster)
@@ -82,28 +80,12 @@ def compute_purity(y_true, y_pred):
     y_mapped = np.array([mapping[label] for label in y_pred])
     return np.mean(y_mapped == y_true)
 
+
 def compute_hungarian_accuracy(y_true, y_pred):
-    y_mapped = _mapped_labels(y_true, y_pred)  
+    """Strict one‑to‑one Hungarian accuracy."""
+    y_mapped = _mapped_labels(y_true, y_pred)
     return np.mean(y_mapped == y_true)
 
-# def compute_purity(y_true, y_pred):
-#     """Majority‑vote (purity) accuracy – NOT one‑to‑one."""
-#     mapping = {}
-#     for cluster in np.unique(y_pred):
-#         mask = (y_pred == cluster)
-#         true_in_cluster = y_true[mask]
-#         if len(true_in_cluster) > 0:
-#             mapping[cluster] = np.bincount(true_in_cluster).argmax()
-#         else:
-#             mapping[cluster] = 0
-#     y_mapped = np.array([mapping[label] for label in y_pred])
-#     return np.mean(y_mapped == y_true)
-
-# def compute_macro_f1(y_true, y_pred):
-#     y_mapped = _mapped_labels(y_true, y_pred)
-#     return f1_score(
-#         y_true, y_mapped, labels=np.unique(y_true), average='macro', zero_division=0
-#     )
 
 def compute_macro_f1(y_true, y_pred):
     """Macro‑F1 using majority‑vote (purity) mapping."""
@@ -122,6 +104,7 @@ def compute_macro_f1(y_true, y_pred):
         average='macro',
         zero_division=0
     )
+
 
 def _nan_row(metrics_list=METRICS_LIST, removed_count=np.nan, removed_pct=np.nan):
     row = {m: (np.nan, np.nan, np.nan, np.nan) for m in metrics_list}
@@ -142,9 +125,8 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
     X_proc, y_proc = X.copy(), y_true.copy()
 
-         # --- Outlier handling ---
+    # --- Outlier handling ---
     if outlier_method.startswith('zscore_robust'):
-        # 'zscore_robust' -> threshold=3.0, 'zscore_robust_2.5' -> threshold=2.5
         if outlier_method == 'zscore_robust':
             threshold = 3.0
         else:
@@ -152,7 +134,6 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         X_proc, y_proc, _ = zscore_robust_filter(X_proc, y_proc, threshold=threshold,
                                                  min_per_class=min_per_class)
     elif outlier_method.startswith('zscore'):
-        # 'zscore' -> threshold=3.0, 'zscore_2.5' -> threshold=2.5
         if outlier_method == 'zscore':
             threshold = 3.0
         else:
@@ -183,7 +164,6 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         X_proc = standard_scale(X_proc)
     elif norm_method == 'robust':
         X_proc = robust_scale(X_proc)
-    
 
     D_proc = _pairwise_distance_matrix(X_proc, metric)
 
@@ -208,7 +188,7 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
         if len(np.unique(labels)) < 2 or X_proc.shape[0] < 2:
             results['inertia'].append(model.inertia_)
-            for m in ['silhouette', 'ari', 'nmi', 'acc', 'purity', 'macro_f1']:
+            for m in ['silhouette', 'ari', 'nmi', 'acc', 'hungarian_acc', 'macro_f1']:
                 results[m].append(np.nan)
             continue
 
@@ -218,8 +198,8 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
         )
         results['ari'].append(adjusted_rand_score(y_proc, labels))
         results['nmi'].append(normalized_mutual_info_score(y_proc, labels))
-        results['acc'].append(compute_hungarian_accuracy(y_proc, labels))
-        results['purity'].append(compute_purity(y_proc, labels))
+        results['acc'].append(compute_accuracy(y_proc, labels))                     # purity
+        results['hungarian_acc'].append(compute_hungarian_accuracy(y_proc, labels)) # Hungarian
         results['macro_f1'].append(compute_macro_f1(y_proc, labels))
 
     agg = {}
