@@ -1,9 +1,10 @@
 # outlier_handling.py
 import numpy as np
 
-def _protect_min_class_size(X, y, mask, min_per_class, extremeness_score):
-    """
-    """
+def _protect_min_class_size(y, mask, min_per_class, extremeness_score):
+    """Restore the least extreme filtered samples to protect each class."""
+    if min_per_class < 1:
+        raise ValueError("min_per_class must be at least 1")
     mask = mask.copy()
     for cls in np.unique(y):
         cls_idx = np.where(y == cls)[0]
@@ -41,7 +42,7 @@ def zscore_filter(X, y=None, threshold=3.0, min_per_class=None):
     if y is not None:
         if min_per_class is not None:
             extremeness = z_scores.max(axis=1)  # higher = more extreme
-            mask = _protect_min_class_size(X, y, mask, min_per_class, extremeness)
+            mask = _protect_min_class_size(y, mask, min_per_class, extremeness)
         return X[mask], y[mask], mask
     return X[mask], mask
 
@@ -62,7 +63,7 @@ def zscore_robust_filter(X, y=None, threshold=3.0, min_per_class=None):
     if y is not None:
         if min_per_class is not None:
             extremeness = z_scores.max(axis=1)
-            mask = _protect_min_class_size(X, y, mask, min_per_class, extremeness)
+            mask = _protect_min_class_size(y, mask, min_per_class, extremeness)
         return X[mask], y[mask], mask
     return X[mask], mask
 
@@ -97,6 +98,6 @@ def iqr_filter(X, y=None, multiplier=1.5, min_per_class=None):
             beyond_lower = np.maximum(lower - X, 0)
             beyond_upper = np.maximum(X - upper, 0)
             extremeness = (beyond_lower + beyond_upper).max(axis=1)
-            mask = _protect_min_class_size(X, y, mask, min_per_class, extremeness)
+            mask = _protect_min_class_size(y, mask, min_per_class, extremeness)
         return X[mask], y[mask], mask
     return X[mask], mask

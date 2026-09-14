@@ -44,6 +44,13 @@ METRICS_LIST = [
     'removed_pct',
 ]
 
+SCALERS = {
+    'none': lambda X: X,
+    'minmax': minmax_scale,
+    'standard': standard_scale,
+    'robust': robust_scale,
+}
+
 
 def _pairwise_distance_matrix(X, metric):
     distance_fn = get_metric(metric)
@@ -67,18 +74,19 @@ def _mapped_labels(y_true, y_pred):
     return np.array([mapping.get(label, -1) for label in y_pred])
 
 
-def compute_accuracy(y_true, y_pred):
-    """Majority‑vote (purity) accuracy – now the default 'acc' column."""
+def _majority_vote_labels(y_true, y_pred):
+    """Map each predicted cluster to its most frequent true label."""
     mapping = {}
     for cluster in np.unique(y_pred):
         mask = (y_pred == cluster)
         true_in_cluster = y_true[mask]
-        if len(true_in_cluster) > 0:
-            mapping[cluster] = np.bincount(true_in_cluster).argmax()
-        else:
-            mapping[cluster] = 0
-    y_mapped = np.array([mapping[label] for label in y_pred])
-    return np.mean(y_mapped == y_true)
+        mapping[cluster] = np.bincount(true_in_cluster).argmax()
+    return np.array([mapping[label] for label in y_pred])
+
+
+def compute_accuracy(y_true, y_pred):
+    """Return majority-vote (purity) clustering accuracy."""
+    return np.mean(_majority_vote_labels(y_true, y_pred) == y_true)
 
 
 def compute_hungarian_accuracy(y_true, y_pred):
@@ -89,15 +97,7 @@ def compute_hungarian_accuracy(y_true, y_pred):
 
 def compute_macro_f1(y_true, y_pred):
     """Macro‑F1 using majority‑vote (purity) mapping."""
-    mapping = {}
-    for cluster in np.unique(y_pred):
-        mask = (y_pred == cluster)
-        true_in_cluster = y_true[mask]
-        if len(true_in_cluster) > 0:
-            mapping[cluster] = np.bincount(true_in_cluster).argmax()
-        else:
-            mapping[cluster] = 0
-    y_mapped = np.array([mapping[label] for label in y_pred])
+    y_mapped = _majority_vote_labels(y_true, y_pred)
     return f1_score(
         y_true, y_mapped,
         labels=np.unique(y_true),
@@ -113,6 +113,22 @@ def _nan_row(metrics_list=METRICS_LIST, removed_count=np.nan, removed_pct=np.nan
     return row
 
 
+def _parse_outlier_method(method):
+    """Return the filter and parameter encoded by a configured method name."""
+    if method == 'none':
+        return None, None
+    if method.startswith('zscore_robust'):
+        threshold = 3.0 if method == 'zscore_robust' else float(method.removeprefix('zscore_robust_'))
+        return zscore_robust_filter, {'threshold': threshold}
+    if method.startswith('zscore'):
+        threshold = 3.0 if method == 'zscore' else float(method.removeprefix('zscore_'))
+        return zscore_filter, {'threshold': threshold}
+    if method.startswith('iqr'):
+        multiplier = 1.5 if method == 'iqr' else float(method.removeprefix('iqr_'))
+        return iqr_filter, {'multiplier': multiplier}
+    raise ValueError(f"Unsupported outlier method: {method!r}")
+
+
 def run_single_config(dataset_name, outlier_method, norm_method, metric,
                        n_runs=100, random_state_base=42, min_per_class=None):
     """
@@ -125,28 +141,11 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
 
     X_proc, y_proc = X.copy(), y_true.copy()
 
-    # --- Outlier handling ---
-    if outlier_method.startswith('zscore_robust'):
-        if outlier_method == 'zscore_robust':
-            threshold = 3.0
-        else:
-            threshold = float(outlier_method.split('_')[2])
-        X_proc, y_proc, _ = zscore_robust_filter(X_proc, y_proc, threshold=threshold,
-                                                 min_per_class=min_per_class)
-    elif outlier_method.startswith('zscore'):
-        if outlier_method == 'zscore':
-            threshold = 3.0
-        else:
-            threshold = float(outlier_method.split('_')[1])
-        X_proc, y_proc, _ = zscore_filter(X_proc, y_proc, threshold=threshold,
-                                           min_per_class=min_per_class)
-    elif outlier_method.startswith('iqr'):
-        if outlier_method == 'iqr':
-            multiplier = 1.5
-        else:
-            multiplier = float(outlier_method.split('_')[1])
-        X_proc, y_proc, _ = iqr_filter(X_proc, y_proc, multiplier=multiplier,
-                                        min_per_class=min_per_class)
+    filter_func, filter_params = _parse_outlier_method(outlier_method)
+    if filter_func is not None:
+        X_proc, y_proc, _ = filter_func(
+            X_proc, y_proc, min_per_class=min_per_class, **filter_params
+        )
 
     removed_count = X.shape[0] - X_proc.shape[0]
     removed_pct = 100.0 * removed_count / X.shape[0]
@@ -158,12 +157,10 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
     if n_classes_remaining < n_clusters:
         return _nan_row(removed_count=removed_count, removed_pct=removed_pct)
 
-    if norm_method == 'minmax':
-        X_proc = minmax_scale(X_proc)
-    elif norm_method == 'standard':
-        X_proc = standard_scale(X_proc)
-    elif norm_method == 'robust':
-        X_proc = robust_scale(X_proc)
+    try:
+        X_proc = SCALERS[norm_method](X_proc)
+    except KeyError as exc:
+        raise ValueError(f"Unsupported normalisation method: {norm_method!r}") from exc
 
     D_proc = _pairwise_distance_matrix(X_proc, metric)
 

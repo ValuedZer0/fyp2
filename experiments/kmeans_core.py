@@ -1,4 +1,5 @@
-# kmeans_core.py
+"""A small, metric-aware K-means implementation used by the experiments."""
+
 import numpy as np
 from distance_metrics import get_metric
 
@@ -20,6 +21,12 @@ class KMeans:
 
     def fit(self, X):
         X = np.asarray(X, dtype=float)
+        if X.ndim != 2 or X.shape[0] == 0:
+            raise ValueError("X must be a non-empty two-dimensional array")
+        if self.n_clusters < 1:
+            raise ValueError("n_clusters must be at least 1")
+        if self.n_init < 1:
+            raise ValueError("n_init must be at least 1")
         n_samples = X.shape[0]
 
         if self.n_clusters > n_samples:
