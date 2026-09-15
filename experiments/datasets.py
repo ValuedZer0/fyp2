@@ -1,4 +1,4 @@
-"""Dataset loading helpers for the benchmark experiments."""
+""" Dataset loading helpers for the benchmark experiments """
 
 from pathlib import Path
 
@@ -11,14 +11,14 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def _data_path(filename):
-    """Return the absolute path to a bundled dataset file."""
+    """ Return the absolute path to a bundled dataset file """
     return DATA_DIR / filename
 
 
 def load_dataset(name):
     """
     Load a benchmark dataset by name.
-    Returns X (features) and y_true (ground truth labels).
+    Returns X (features) and y_true (ground truth labels)
     """
     name = name.lower()
     if name == 'iris':

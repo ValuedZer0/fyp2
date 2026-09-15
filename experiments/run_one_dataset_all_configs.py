@@ -1,7 +1,7 @@
-"""Run all experiment configurations for one selected dataset.
-
+"""
+Run all experiment configurations for one selected dataset
 Usage: python run_one_dataset_all_configs.py
-Change DATASET_NAME below to select the dataset.
+Change DATASET_NAME below to select the dataset
 """
 import os
 

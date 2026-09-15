@@ -1,6 +1,6 @@
 # run_all_dataset.py
 """
-Run all experiment combinations for EVERY dataset listed in configs.DATASETS.
+Run all experiment combinations for EVERY dataset listed in configs.DATASETS
 Usage: python run_all_dataset.py
 """
 import os

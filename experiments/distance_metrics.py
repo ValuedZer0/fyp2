@@ -1,7 +1,7 @@
 # kmeans/distances.py
 """
 Distance metrics
-Each function takes (X, centroids) -> (n_samples, n_clusters) distance array.
+Each function takes (X, centroids) -> (n_samples, n_clusters) distance array
 
 """
 import numpy as np

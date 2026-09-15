@@ -2,7 +2,7 @@
 import numpy as np
 
 def _protect_min_class_size(y, mask, min_per_class, extremeness_score):
-    """Restore the least extreme filtered samples to protect each class."""
+    """ Restore the least extreme filtered samples to protect each class """
     if min_per_class < 1:
         raise ValueError("min_per_class must be at least 1")
     mask = mask.copy()
@@ -19,7 +19,7 @@ def _protect_min_class_size(y, mask, min_per_class, extremeness_score):
 
 def zscore_filter(X, y=None, threshold=3.0, min_per_class=None):
     """
-    Remove points where any feature has |z| > threshold.
+    Remove points where any feature has |z| > threshold
 
     Parameters
     ----------
@@ -29,7 +29,7 @@ def zscore_filter(X, y=None, threshold=3.0, min_per_class=None):
     min_per_class : int or None
         If given AND y is provided, guarantees every class retains at
         least this many points, protecting small/extreme classes from
-        being entirely eliminated. Ignored if y is None.
+        being entirely eliminated. Ignored if y is None
 
     Returns
     -------
@@ -48,9 +48,9 @@ def zscore_filter(X, y=None, threshold=3.0, min_per_class=None):
 
 def zscore_robust_filter(X, y=None, threshold=3.0, min_per_class=None):
     """
-    Remove points where any feature has a robust |z| > threshold.
+    Remove points where any feature has a robust |z| > threshold
     Robust z‑score uses median and median absolute deviation (MAD)
-    instead of mean and std, making it resistant to the outliers it detects.
+    instead of mean and std, making it resistant to the outliers it detects
     """
     from scipy.stats import median_abs_deviation
 
@@ -69,7 +69,7 @@ def zscore_robust_filter(X, y=None, threshold=3.0, min_per_class=None):
 
 def iqr_filter(X, y=None, multiplier=1.5, min_per_class=None):
     """
-    Remove points outside Tukey's fences: [Q1 - multiplier*IQR, Q3 + multiplier*IQR].
+    Remove points outside Tukey's fences: [Q1 - multiplier*IQR, Q3 + multiplier*IQR]
 
     Parameters
     ----------

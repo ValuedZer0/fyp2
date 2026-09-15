@@ -1,4 +1,4 @@
-"""A small, metric-aware K-means implementation used by the experiments."""
+""" A small, metric-aware K-means implementation used by the experiments """
 
 import numpy as np
 from distance_metrics import get_metric
@@ -90,7 +90,7 @@ class KMeans:
         return np.argmin(self._distances(X, centroids), axis=1)
 
     def _update(self, X, labels, rng, centroids=None):
-        """Update centroids using means, medians (Manhattan), or modes (Hamming)."""
+        """ Update centroids using means, medians (Manhattan), or modes (Hamming) """
         if centroids is None:
             centroids = self.centroids
         new_centroids = np.zeros_like(centroids)
@@ -109,7 +109,7 @@ class KMeans:
 
     @staticmethod
     def _componentwise_mode(X):
-        """Return a deterministic categorical prototype for Hamming distance."""
+        """ Return a deterministic categorical prototype for Hamming distance """
         modes = np.empty(X.shape[1], dtype=X.dtype)
         for feature_idx in range(X.shape[1]):
             values, counts = np.unique(X[:, feature_idx], return_counts=True)

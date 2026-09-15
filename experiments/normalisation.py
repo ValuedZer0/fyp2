@@ -2,7 +2,7 @@
 import numpy as np
 
 def minmax_scale(X):
-    """Min‑Max scaling: x' = (x - min) / (max - min)  (Eq. 2.13)"""
+    """ Min‑Max scaling: x' = (x - min) / (max - min) """
     X = np.asarray(X, dtype=float)
     min_vals = np.min(X, axis=0)
     max_vals = np.max(X, axis=0)
@@ -11,7 +11,7 @@ def minmax_scale(X):
     return (X - min_vals) / range_vals
 
 def standard_scale(X):
-    """Z‑score standardisation: x' = (x - μ) / σ  (Eq. 2.14)"""
+    """ Z‑score standardisation: x' = (x - μ) / σ """
     X = np.asarray(X, dtype=float)
     mean = np.mean(X, axis=0)
     std = np.std(X, axis=0, ddof=0)   
@@ -19,7 +19,7 @@ def standard_scale(X):
     return (X - mean) / std
 
 def robust_scale(X):
-    """Robust scaling: x' = (x - median) / IQR  (Eq. 2.15)"""
+    """ Robust scaling: x' = (x - median) / IQR """
     X = np.asarray(X, dtype=float)
     median = np.median(X, axis=0)
     q1 = np.percentile(X, 25, axis=0)

@@ -1,7 +1,7 @@
-"""Run three manually selected configurations for one dataset.
-
+"""
+Run three manually selected configurations for one dataset
 Usage: python run_selected_config.py
-Edit DATASET_NAME and SELECTED_CONFIGS below before running.
+Edit DATASET_NAME and SELECTED_CONFIGS below before running
 """
 import os
 
@@ -15,7 +15,7 @@ N_RUNS = 100
 RANDOM_STATE_BASE = 42
 RESULTS_DIR = 'results'
 
-# Each tuple is: (outlier method, normalisation method, distance metric).
+# (outlier method, normalisation method, distance metric).
 SELECTED_CONFIGS = [
     ('none', 'minmax', 'euclidean'),
     ('zscore', 'standard', 'manhattan'),

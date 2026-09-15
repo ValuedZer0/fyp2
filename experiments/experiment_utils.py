@@ -1,6 +1,6 @@
 # experiment_utils.py
 """
-Shared logic for running a single configuration n_runs times and aggregating the results.
+Shared logic for running a single configuration n_runs times and aggregating the results
 """
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -75,7 +75,7 @@ def _mapped_labels(y_true, y_pred):
 
 
 def _majority_vote_labels(y_true, y_pred):
-    """Map each predicted cluster to its most frequent true label."""
+    """ Map each predicted cluster to its most frequent true label """
     mapping = {}
     for cluster in np.unique(y_pred):
         mask = (y_pred == cluster)
@@ -85,18 +85,18 @@ def _majority_vote_labels(y_true, y_pred):
 
 
 def compute_accuracy(y_true, y_pred):
-    """Return majority-vote (purity) clustering accuracy."""
+    """ Return majority-vote (purity) clustering accuracy """
     return np.mean(_majority_vote_labels(y_true, y_pred) == y_true)
 
 
 def compute_hungarian_accuracy(y_true, y_pred):
-    """Strict one‑to‑one Hungarian accuracy."""
+    """ Strict one‑to‑one Hungarian accuracy """
     y_mapped = _mapped_labels(y_true, y_pred)
     return np.mean(y_mapped == y_true)
 
 
 def compute_macro_f1(y_true, y_pred):
-    """Macro‑F1 using majority‑vote (purity) mapping."""
+    """ Macro‑F1 using majority‑vote (purity) mapping """
     y_mapped = _majority_vote_labels(y_true, y_pred)
     return f1_score(
         y_true, y_mapped,
@@ -114,7 +114,7 @@ def _nan_row(metrics_list=METRICS_LIST, removed_count=np.nan, removed_pct=np.nan
 
 
 def _parse_outlier_method(method):
-    """Return the filter and parameter encoded by a configured method name."""
+    """ Return the filter and parameter encoded by a configured method name """
     if method == 'none':
         return None, None
     if method.startswith('zscore_robust'):
@@ -134,7 +134,7 @@ def run_single_config(dataset_name, outlier_method, norm_method, metric,
     """
     Runs one (outlier_method, norm_method, metric) configuration n_runs
     times on dataset_name and returns aggregated (mean, std, min, max)
-    per evaluation metric.
+    per evaluation metric
     """
     X, y_true = load_dataset(dataset_name)
     n_clusters = len(np.unique(y_true))
@@ -215,10 +215,10 @@ def run_all_configs(dataset_name, n_runs=100, random_state_base=42, verbose=True
     """
     Runs every (outlier_method, norm_method, metric) combination for one
     dataset and returns a list of result rows (dicts), ready to build a
-    DataFrame from.
+    DataFrame from
 
     min_per_class : int or None
-        Forwarded to run_single_config -> zscore_filter/iqr_filter.
+        Forwarded to run_single_config -> zscore_filter/iqr_filter
     """
     configurations = [
         (out_method, norm, metric)
@@ -239,10 +239,10 @@ def run_all_configs(dataset_name, n_runs=100, random_state_base=42, verbose=True
 def run_selected_configs(dataset_name, configurations, n_runs=100,
                          random_state_base=42, verbose=True,
                          min_per_class=None):
-    """Run only the explicitly selected pipeline configurations.
+    """Run only the explicitly selected pipeline configurations
 
     Each item in ``configurations`` must be a three-item tuple containing
-    ``(outlier_method, norm_method, distance_metric)``.
+    ``(outlier_method, norm_method, distance_metric)``
     """
     configurations = list(configurations)
     if not configurations:

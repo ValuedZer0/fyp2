@@ -1,7 +1,7 @@
 """
 Compute class distribution (imbalance ratio) for all 9 benchmark datasets
 using the project's own datasets.load_dataset(), so counts match exactly
-what K-means / evaluation actually sees.
+what K-means / evaluation actually sees
 
 Run from the experiments/ directory:
     python class_distribution.py
