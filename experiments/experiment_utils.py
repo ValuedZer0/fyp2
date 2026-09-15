@@ -220,31 +220,61 @@ def run_all_configs(dataset_name, n_runs=100, random_state_base=42, verbose=True
     min_per_class : int or None
         Forwarded to run_single_config -> zscore_filter/iqr_filter.
     """
+    configurations = [
+        (out_method, norm, metric)
+        for out_method in OUTLIER_METHODS
+        for norm in NORM_METHODS
+        for metric in DISTANCE_METRICS
+    ]
+    return run_selected_configs(
+        dataset_name,
+        configurations,
+        n_runs=n_runs,
+        random_state_base=random_state_base,
+        verbose=verbose,
+        min_per_class=min_per_class,
+    )
+
+
+def run_selected_configs(dataset_name, configurations, n_runs=100,
+                         random_state_base=42, verbose=True,
+                         min_per_class=None):
+    """Run only the explicitly selected pipeline configurations.
+
+    Each item in ``configurations`` must be a three-item tuple containing
+    ``(outlier_method, norm_method, distance_metric)``.
+    """
+    configurations = list(configurations)
+    if not configurations:
+        raise ValueError("At least one configuration must be selected")
+
     rows = []
-    total_combos = len(OUTLIER_METHODS) * len(NORM_METHODS) * len(DISTANCE_METRICS)
-    count = 0
-    for out_method in OUTLIER_METHODS:
-        for norm in NORM_METHODS:
-            for metric in DISTANCE_METRICS:
-                count += 1
-                if verbose:
-                    print(f"[{count}/{total_combos}] {dataset_name} | "
-                          f"outlier={out_method} | norm={norm} | metric={metric}")
-                agg = run_single_config(
-                    dataset_name, out_method, norm, metric,
-                    n_runs=n_runs, random_state_base=random_state_base,
-                    min_per_class=min_per_class,
-                )
-                row = {
-                    'dataset': dataset_name,
-                    'outlier_method': out_method,
-                    'norm': norm,
-                    'metric': metric,
-                }
-                for m, (mean, std, vmin, vmax) in agg.items():
-                    row[f'{m}_mean'] = mean
-                    row[f'{m}_std'] = std
-                    row[f'{m}_min'] = vmin
-                    row[f'{m}_max'] = vmax
-                rows.append(row)
+    for count, config in enumerate(configurations, start=1):
+        if len(config) != 3:
+            raise ValueError(
+                "Each configuration must contain "
+                "(outlier_method, norm_method, distance_metric)"
+            )
+        out_method, norm, metric = config
+        if verbose:
+            print(f"[{count}/{len(configurations)}] {dataset_name} | "
+                  f"outlier={out_method} | norm={norm} | metric={metric}")
+
+        agg = run_single_config(
+            dataset_name, out_method, norm, metric,
+            n_runs=n_runs, random_state_base=random_state_base,
+            min_per_class=min_per_class,
+        )
+        row = {
+            'dataset': dataset_name,
+            'outlier_method': out_method,
+            'norm': norm,
+            'metric': metric,
+        }
+        for metric_name, (mean, std, vmin, vmax) in agg.items():
+            row[f'{metric_name}_mean'] = mean
+            row[f'{metric_name}_std'] = std
+            row[f'{metric_name}_min'] = vmin
+            row[f'{metric_name}_max'] = vmax
+        rows.append(row)
     return rows
